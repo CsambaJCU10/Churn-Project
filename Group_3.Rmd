@@ -1,0 +1,89 @@
+---
+title: "Group 3 Business Analytics Project"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r}
+library(dplyr)
+library(gam)
+library(readr)
+Churn_Train <- read_csv("Churn_Train.csv")
+summary(Churn_Train)
+#Removed 200 lines that contain a majority of NA values
+Churn_Train1 <- as.data.frame(Churn_Train[!is.na(Churn_Train$number_vmail_messages),])
+#Replace the remaining NA values with mean of the columns
+Churn <-  Churn_Train1 %>%
+  na.gam.replace()
+#Make the churn column a factor data type
+Churn[, 'churn'] <- as.factor(Churn[, 'churn'])
+#Turn the negative values in the account_length and number_vmail_messages into positive values
+Churn[, 'account_length'] <- abs(Churn[, 'account_length'])
+Churn[, 'number_vmail_messages'] <- abs(Churn[, 'number_vmail_messages'])
+summary(Churn)
+```
+
+
+```{r}
+library(pROC)
+model <- glm(formula = churn ~ ., family="binomial", data=Churn)
+summary(model)
+
+predict_model <- predict(model, newdata=Churn, type = 'response')
+
+probability <- as.numeric(predict_model>.55)
+
+levels(predict_model) <- list(no='FALSE',yes='TRUE')
+table(Predicted=probability, True=Churn$churn)
+
+roc(Churn$churn,predict_model) 
+plot(roc(Churn$churn,predict_model),col='red',lwd=2)
+```
+
+```{r}
+library(corrplot)
+numeric.var <- sapply(Churn, is.numeric)
+corr.matrix <- cor(Churn[,numeric.var])
+corrplot(corr.matrix, main="\n\nCorrelation Plot for Numerical Variables", method="number")
+```
+
+
+```{r}
+library(dplyr)
+Churn1 <- Churn %>%
+  filter(churn=="yes") %>%
+  group_by(state) %>%
+  summarise(Total_Churn=n())
+  
+Churn2 <- Churn %>%
+  group_by(state) %>%
+  summarise(Total_Observations=n())
+
+Churn3 <- cbind(Churn1,Churn2[,"Total_Observations"])
+
+Churn_By_State <- Churn3 %>%
+  group_by(state) %>%
+  summarise(Churn_Ratio=Total_Churn/Total_Observations) %>%
+  arrange(desc(Churn_Ratio))
+Churn_By_State
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+Churn_Yes <- Churn %>%
+  filter(churn=="yes")
+  
+Churn_No <- Churn %>%
+  filter(churn=="no") 
+ 
+intern_churn_yes <- ggplot(Churn_Yes, aes(x=international_plan)) + ggtitle("Customers Who Are Expected to Churn") + xlab("International Plan") +geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5, fill="black") + ylab("Percentage") + coord_flip() + theme_minimal()
+intern_churn_yes
+
+intern_churn_no <- ggplot(Churn_No, aes(x=international_plan)) + ggtitle("Customers Who Are Not Expected to Churn") + xlab("International Plan") + geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5, fill="blue") + ylab("Percentage") + coord_flip() + theme_minimal()
+intern_churn_no
+
+```
+
+
